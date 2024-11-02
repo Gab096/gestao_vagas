@@ -1,6 +1,7 @@
 package br.com.gabriel.gestao_vagas.modules.company.useCases;
 
 import br.com.gabriel.gestao_vagas.modules.company.dto.AuthCompanyDto;
+import br.com.gabriel.gestao_vagas.modules.company.dto.AuthCompanyResponseDTO;
 import br.com.gabriel.gestao_vagas.modules.company.repositories.CompanyRespository;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import javax.naming.AuthenticationException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 
 @Service
 public class AuthCompanyUseCase {
@@ -23,7 +25,7 @@ public class AuthCompanyUseCase {
     private CompanyRespository companyRespository;
     @Autowired
     private PasswordEncoder passwordEncoder;
-    public String execute (AuthCompanyDto authCompanyDto) throws AuthenticationException {
+    public AuthCompanyResponseDTO execute (AuthCompanyDto authCompanyDto) throws AuthenticationException {
         var company = companyRespository.findByUsername(authCompanyDto.getUsername()).orElseThrow(
             () -> new UsernameNotFoundException("Username/Password incorrect")
         );
@@ -33,12 +35,25 @@ public class AuthCompanyUseCase {
         if(!passwordMatches){
             throw new AuthenticationException();
         }
+
         Algorithm algorithm = Algorithm.HMAC256(secretKey);
-        return JWT.create()
+
+        var expiresIn = Instant.now().plus(Duration.ofHours(2));
+
+        var token = JWT.create()
                 .withExpiresAt(Instant.now().plus(Duration.ofHours(2)))
                 .withIssuer("javagas")
+                .withExpiresAt(expiresIn)
+                .withClaim("roles" , Arrays.asList("COMPANY"))
                 .withSubject(company.getId().toString())
                 .sign(algorithm);
+
+        var authCompanyResponseDTO = AuthCompanyResponseDTO.builder()
+                .access_token(token)
+                .expires_in(expiresIn.toEpochMilli())
+                .build();
+
+        return authCompanyResponseDTO ;
 
     }
 }
